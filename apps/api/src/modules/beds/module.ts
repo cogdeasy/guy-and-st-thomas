@@ -307,8 +307,9 @@ interface BedSummary {
 }
 
 function summariseBeds(beds: Location[]): BedSummary {
+  // Treat an unset status as 'available', matching the board and allocate logic.
   const occupied = beds.filter((b) => b.operationalStatus === 'occupied').length;
-  const available = beds.filter((b) => b.operationalStatus === 'available').length;
+  const available = beds.filter((b) => (b.operationalStatus ?? 'available') === 'available').length;
   const closed = beds.filter((b) => b.operationalStatus === 'closed').length;
   const total = beds.length;
   const denom = occupied + available || total;
