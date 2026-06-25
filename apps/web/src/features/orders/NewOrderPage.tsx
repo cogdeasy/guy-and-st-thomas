@@ -60,16 +60,23 @@ export function NewOrderPage() {
 
   const submit = async () => {
     if (!selectedPatient || basket.length === 0) return;
-    for (const item of basket) {
-      await placeOrder.mutateAsync({
-        patientId: selectedPatient.id,
-        itemId: item.id,
-        priority,
-        clinicalDetails: clinicalDetails.trim() || undefined,
-      });
+    let placedCount = 0;
+    try {
+      // Remove each item as it succeeds so a retry after a mid-basket failure
+      // never re-sends an order that already went through.
+      for (const item of [...basket]) {
+        await placeOrder.mutateAsync({
+          patientId: selectedPatient.id,
+          itemId: item.id,
+          priority,
+          clinicalDetails: clinicalDetails.trim() || undefined,
+        });
+        placedCount += 1;
+        setBasket((prev) => prev.filter((b) => b.id !== item.id));
+      }
+    } finally {
+      if (placedCount > 0) setPlaced(placedCount);
     }
-    setPlaced(basket.length);
-    setBasket([]);
     setClinicalDetails('');
     setTimeout(() => navigate('/orders'), 900);
   };
