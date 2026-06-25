@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Encounter, Patient, Practitioner, Task } from '@trustos/ontology';
-import { RequestPriority } from '@trustos/ontology';
+import { CodeSystems, RequestPriority } from '@trustos/ontology';
 import {
   BadRequest,
   NotFound,
@@ -137,7 +137,7 @@ export default defineModule({
           ? {
               id: patient.id,
               name: patientName(patient),
-              nhsNumber: patient.identifier?.find((idf) => idf.use === 'official')?.value,
+              nhsNumber: patient.identifier?.find((idf) => idf.system === CodeSystems.NHS_NUMBER)?.value,
             }
           : null,
         owner: owner ? { id: owner.id, name: practitionerName(owner), role: owner.role } : null,
