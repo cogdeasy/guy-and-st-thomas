@@ -96,8 +96,8 @@ export default defineModule({
     app.post<{ Params: { id: string }; Body: unknown }>('/:id/query', async (req) => {
       const body = QueryBody.parse(req.body ?? {});
       const record = store.getOrThrow<DispenseRecord>(DISPENSE_COLLECTION, req.params.id);
-      if (record.status === 'dispensed') {
-        throw new ApiError(409, 'Cannot query a dispensed prescription', 'invalid_transition');
+      if (record.status === 'verified' || record.status === 'dispensed') {
+        throw new ApiError(409, `Cannot query a ${record.status} prescription`, 'invalid_transition');
       }
       const pharmacist = resolvePharmacist(store, body.pharmacistId);
       return transition(store, record, 'query', pharmacist, body.note);

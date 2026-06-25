@@ -97,6 +97,21 @@ describe('pharmacy module', () => {
     expect(overridden.json().record.status).toBe('verified');
   });
 
+  it('rejects querying an already-verified prescription', async () => {
+    const queue = await app.inject({ method: 'GET', url: '/api/pharmacy/verify-queue' });
+    const target = (queue.json().items as QueueItem[]).find((i) => i.allergyConflicts.length === 0);
+    expect(target).toBeTruthy();
+    const id = target!.record.id;
+    await app.inject({ method: 'POST', url: `/api/pharmacy/${id}/verify`, payload: {} });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/pharmacy/${id}/query`,
+      payload: { note: 'too late' },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe('invalid_transition');
+  });
+
   it('requires a note when raising a query', async () => {
     const queue = await app.inject({ method: 'GET', url: '/api/pharmacy/verify-queue' });
     const first = (queue.json().items as QueueItem[])[0];

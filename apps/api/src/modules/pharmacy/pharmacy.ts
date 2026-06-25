@@ -189,6 +189,10 @@ export function detectAllergyConflicts(
     if (drugClasses.has('penicillin') && allergen.includes('penicillin')) return true;
     if (drugClasses.has('nsaid') && (allergen.includes('ibuprofen') || allergen.includes('nsaid')))
       return true;
+    if (drugClasses.has('opioid') && (allergen.includes('opioid') || allergen.includes('morphine')))
+      return true;
+    // Direct name overlap — guarded so an absent medication text can't match every allergen.
+    if (!drugText) return false;
     return drugText.includes(allergen) || allergen.includes(drugText);
   });
 }
