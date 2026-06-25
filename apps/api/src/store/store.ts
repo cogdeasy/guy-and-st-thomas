@@ -21,8 +21,14 @@ export class DataStore {
   private data = new Map<string, Map<string, Entity>>();
   private validators = new Map<string, Validator>();
   private auditLog: AuditEvent[] = [];
+  private readonly idRng: () => number;
 
-  constructor() {
+  /**
+   * @param idRng source of randomness for generated ids. Pass the seeded rng
+   * so demo data is reproducible across builds; defaults to Math.random.
+   */
+  constructor(idRng: () => number = Math.random) {
+    this.idRng = idRng;
     for (const type of Object.keys(ResourceSchemas) as ResourceType[]) {
       this.registerCollection(type, (input) => ResourceSchemas[type].parse(input) as Entity);
     }
@@ -47,7 +53,7 @@ export class DataStore {
   }
 
   create<T extends Entity = Entity>(name: string, input: Record<string, unknown>): T {
-    const id = (input.id as string) || randomId(name.toLowerCase().slice(0, 3));
+    const id = (input.id as string) || randomId(name.toLowerCase().slice(0, 3), this.idRng);
     const withMeta = {
       ...input,
       id,

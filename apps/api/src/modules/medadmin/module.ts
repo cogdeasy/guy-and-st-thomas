@@ -19,7 +19,6 @@ import {
   MATCH_WINDOW_MS,
   OMISSION_REASONS,
   STATUS_ORDER,
-  type FormularyEntry,
   hashId,
   isFrequencyCode,
   nearestSlot,
@@ -284,55 +283,80 @@ export default defineModule({
       if (!patientId) continue;
       const patient = store.get<Patient>('Patient', patientId);
       if (!patient) continue;
-      // Idempotent: skip patients that already have an active prescription.
-      if (activeRequests(store, patientId).length > 0) continue;
 
-      const drugs = sample(FORMULARY, randInt(2, 5, rng), rng);
-      for (const drug of drugs) {
-        const requester = pick(practitioners, rng);
-        const mr = store.create<MedicationRequest>('MedicationRequest', {
-          status: 'active',
-          intent: 'order',
-          priority: 'routine',
-          medication: {
-            coding: [{ system: CodeSystems.DMD, code: drug.code, display: drug.display }],
-            text: drug.display,
-          },
-          subject: { reference: ref('Patient', patientId), display: patientDisplay(patient) },
-          encounter: { reference: ref('Encounter', encounter.id) },
-          requester: {
-            reference: ref('Practitioner', requester.id),
-            display: practitionerName(requester),
-          },
-          authoredOn: isoDaysAgo(randInt(1, 6, rng)),
-          dosageInstruction: [
-            {
-              text: `${drug.dose} ${drug.route} — ${FREQUENCY_LABELS[drug.frequency]}`,
-              route: drug.route,
-              doseQuantity: drug.dose,
-              frequency: drug.frequency,
-              asNeeded: false,
-            },
-          ],
-          courseOfTherapyType: 'continuous',
-        });
-
-        seedAdministrations(store, mr, drug, performerPool, dayAgo, now, rng);
+      // Always lay down a small, frequency-varied inpatient regimen of our own
+      // so the drug round is populated with actionable doses at any time of day,
+      // then also administer against any orders other modules (e.g.
+      // e-prescribing) have already written for the patient.
+      const existing = activeRequests(store, patientId);
+      const seeded = seedRegimen(store, patient, patientId, encounter.id, practitioners, rng);
+      for (const mr of [...existing, ...seeded]) {
+        seedAdministrations(
+          store,
+          mr,
+          frequencyCode(mr),
+          mr.dosageInstruction?.[0]?.doseQuantity ?? '',
+          performerPool,
+          dayAgo,
+          now,
+          rng,
+        );
       }
     }
   },
 });
 
+function seedRegimen(
+  store: DataStore,
+  patient: Patient,
+  patientId: string,
+  encounterId: string,
+  practitioners: Practitioner[],
+  rng: () => number,
+): MedicationRequest[] {
+  const drugs = sample(FORMULARY, randInt(2, 5, rng), rng);
+  return drugs.map((drug) => {
+    const requester = pick(practitioners, rng);
+    return store.create<MedicationRequest>('MedicationRequest', {
+      status: 'active',
+      intent: 'order',
+      priority: 'routine',
+      medication: {
+        coding: [{ system: CodeSystems.DMD, code: drug.code, display: drug.display }],
+        text: drug.display,
+      },
+      subject: { reference: ref('Patient', patientId), display: patientDisplay(patient) },
+      encounter: { reference: ref('Encounter', encounterId) },
+      requester: {
+        reference: ref('Practitioner', requester.id),
+        display: practitionerName(requester),
+      },
+      authoredOn: isoDaysAgo(randInt(1, 6, rng)),
+      dosageInstruction: [
+        {
+          text: `${drug.dose} ${drug.route} — ${FREQUENCY_LABELS[drug.frequency]}`,
+          route: drug.route,
+          doseQuantity: drug.dose,
+          frequency: drug.frequency,
+          asNeeded: false,
+        },
+      ],
+      courseOfTherapyType: 'continuous',
+    });
+  });
+}
+
 function seedAdministrations(
   store: DataStore,
   mr: MedicationRequest,
-  drug: FormularyEntry,
+  frequency: FrequencyCode,
+  dose: string,
   performerPool: Practitioner[],
   from: Date,
   now: Date,
   rng: () => number,
 ): void {
-  const slots = scheduleSlots(drug.frequency, from, now, now);
+  const slots = scheduleSlots(frequency, from, now, now);
   for (const slotIso of slots) {
     const slotMs = Date.parse(slotIso);
     // Leave the last hour un-actioned so the round surfaces live due/overdue.
@@ -354,7 +378,7 @@ function seedAdministrations(
         reference: ref('Practitioner', performer.id),
         display: practitionerName(performer),
       },
-      dosageText: drug.dose,
+      dosageText: dose,
       ...(reason ? { notGivenReason: reason.display } : {}),
     });
   }

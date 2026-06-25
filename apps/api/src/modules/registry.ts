@@ -38,11 +38,17 @@ export async function registerModules(
     registered.push({ id: mod.id, name: mod.name, description: mod.description });
   }
 
-  // Seeds run after all collections are registered so cross-module refs resolve.
+  app.log.info(`Registered ${registered.length} hospital module(s)`);
+  return registered;
+}
+
+/**
+ * Run every module's seed. Kept separate from registration so the caller can run
+ * it after all collections are registered (so cross-module refs resolve) and
+ * inside a frozen clock for reproducible demo data.
+ */
+export function seedModules(ctx: ModuleContext): void {
   for (const mod of modules) {
     mod.seed?.(ctx);
   }
-
-  app.log.info(`Registered ${registered.length} hospital module(s)`);
-  return registered;
 }
