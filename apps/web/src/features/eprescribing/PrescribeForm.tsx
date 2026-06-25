@@ -49,7 +49,6 @@ export function PrescribeForm({ patientId, encounterId, formulary }: Props) {
     setFrequency(drug?.prnByDefault ? 'PRN' : (drug?.defaultFrequency ?? ''));
     setPrn(drug?.prnByDefault ?? false);
     setAcknowledge(false);
-    prescribe.reset();
   }
 
   // Live allergy decision-support as soon as a drug is selected.
@@ -101,7 +100,10 @@ export function PrescribeForm({ patientId, encounterId, formulary }: Props) {
           <Field label="Drug">
             <select
               value={drugCode}
-              onChange={(e) => chooseDrug(drugs.find((d) => d.code === e.target.value))}
+              onChange={(e) => {
+                prescribe.reset();
+                chooseDrug(drugs.find((d) => d.code === e.target.value));
+              }}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-nhs-blue focus:outline-none"
             >
               <option value="">Select from formulary…</option>
