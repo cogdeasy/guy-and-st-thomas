@@ -90,16 +90,16 @@ export function WaitingListPage() {
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Patients waiting" value={metrics.data?.totalWaiting ?? '—'} />
         <Stat
-          label="18-week breaches"
+          label="RTT breaches"
           value={metrics.data?.totalBreaches ?? '—'}
           tone={metrics.data && metrics.data.totalBreaches > 0 ? 'danger' : 'success'}
-          hint="Past RTT target & not yet treated"
+          hint="Past target (18w routine / 4w urgent)"
         />
         <Stat label="TCI booked" value={metrics.data?.scheduledTci ?? '—'} tone="info" hint="To-Come-In date set" />
         <Stat
           label="Longest wait"
           value={metrics.data ? `${metrics.data.longestWaitWeeks}w` : '—'}
-          tone={metrics.data && metrics.data.longestWaitWeeks >= 18 ? 'warning' : 'neutral'}
+          tone={metrics.data && metrics.data.totalBreaches > 0 ? 'warning' : 'neutral'}
         />
       </div>
 
