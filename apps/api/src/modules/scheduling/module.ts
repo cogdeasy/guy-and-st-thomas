@@ -421,7 +421,6 @@ function findSessionByAppointment(store: DataStore, appointmentId: string): Clin
 const TERMINAL_STATUSES: ReadonlySet<string> = new Set(['fulfilled', 'noshow', 'cancelled']);
 
 function assertTransition(current: string, next: string): void {
-  if (current === next) return;
   if (TERMINAL_STATUSES.has(current)) {
     throw BadRequest(`Cannot move appointment from '${current}' to '${next}'`);
   }

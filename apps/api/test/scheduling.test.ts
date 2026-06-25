@@ -141,6 +141,15 @@ describe('scheduling module', () => {
       payload: { status: 'arrived' },
     });
     expect(again.statusCode).toBe(400);
+
+    // Re-posting the current (terminal) status must also be rejected, so a
+    // finalised appointment cannot be silently mutated via its note.
+    const reseen = await app.inject({
+      method: 'POST',
+      url: `/api/scheduling/${appt.id}/status`,
+      payload: { status: 'seen', note: 'override' },
+    });
+    expect(reseen.statusCode).toBe(400);
   });
 
   it('frees the slot when an appointment is cancelled', async () => {
