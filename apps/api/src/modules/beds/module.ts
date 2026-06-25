@@ -182,7 +182,7 @@ export default defineModule({
       const bed = store.get<Location>('Location', bedId);
       if (!bed) throw NotFound(`Location/${bedId}`);
       if (bed.physicalType !== 'bed') throw BadRequest(`Location/${bedId} is not a bed`);
-      if (bed.operationalStatus !== 'available') {
+      if ((bed.operationalStatus ?? 'available') !== 'available') {
         throw BadRequest(`Bed ${bed.name} is ${bed.operationalStatus ?? 'unavailable'} and cannot be allocated`);
       }
 
@@ -274,6 +274,10 @@ export default defineModule({
       if (rng() < 0.35) {
         const free = beds.find((b) => b.operationalStatus === 'available');
         if (free) {
+          // Mutate the local snapshot too: store.update replaces (not mutates)
+          // the stored entity, so without this the next round would re-find
+          // this same bed and double-book it.
+          free.operationalStatus = 'occupied';
           store.update<Location>('Location', free.id, { operationalStatus: 'occupied' });
           store.create<BedOccupancy>('BedOccupancy', {
             bed: { reference: ref('Location', free.id), display: free.name },
