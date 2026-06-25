@@ -92,7 +92,11 @@ export default defineModule({
       if (wardFilter && !wards.some((w) => w.id === wardFilter)) {
         throw NotFound(`Location/${wardFilter}`);
       }
-      const statusFilter = req.query.status?.trim() as DoseStatus | undefined;
+      const statusParam = req.query.status?.trim();
+      if (statusParam && !(statusParam in STATUS_ORDER)) {
+        throw BadRequest(`Unknown status filter: ${statusParam}`);
+      }
+      const statusFilter = statusParam as DoseStatus | undefined;
 
       const encounters = store.query<Encounter>(
         'Encounter',
@@ -203,7 +207,7 @@ export default defineModule({
         medication: mr.medication,
         subject: mr.subject,
         request: { reference: ref('MedicationRequest', mr.id) },
-        effectiveDateTime: new Date().toISOString(),
+        effectiveDateTime: body.scheduledTime ?? new Date().toISOString(),
         ...(performer ? { performer } : {}),
         ...(dose?.doseQuantity ? { dosageText: dose.doseQuantity } : {}),
         ...(reason ? { notGivenReason: reason.display } : {}),
