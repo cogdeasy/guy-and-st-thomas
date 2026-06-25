@@ -415,14 +415,16 @@ function findSessionByAppointment(store: DataStore, appointmentId: string): Clin
     .find((s) => s.slots.some((slot) => slot.appointmentId === appointmentId));
 }
 
-const ATTENDED: ReadonlySet<string> = new Set(['arrived', 'fulfilled', 'noshow', 'cancelled']);
+// Terminal outcomes: once recorded, an appointment can no longer transition.
+// 'booked' and 'arrived' remain open so a clinic can fast-track a walk-in
+// straight to 'seen' or correct a mistaken outcome.
+const TERMINAL_STATUSES: ReadonlySet<string> = new Set(['fulfilled', 'noshow', 'cancelled']);
 
 function assertTransition(current: string, next: string): void {
   if (current === next) return;
-  if (ATTENDED.has(current) && current !== 'arrived') {
+  if (TERMINAL_STATUSES.has(current)) {
     throw BadRequest(`Cannot move appointment from '${current}' to '${next}'`);
   }
-  // From 'arrived' the patient may still be seen, marked DNA in error, or cancelled.
 }
 
 function pickClinician(practitioners: Practitioner[], specialty: string, rng: () => number): Practitioner {
