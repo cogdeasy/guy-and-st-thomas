@@ -1,0 +1,29 @@
+{
+  "name": "@trustos/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen": "tsx scripts/gen-modules.ts",
+    "dev": "pnpm gen && tsx watch src/index.ts",
+    "start": "pnpm gen && tsx src/index.ts",
+    "build": "pnpm gen && tsup",
+    "typecheck": "pnpm gen && tsc --noEmit",
+    "test": "pnpm gen && vitest run"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@fastify/sensible": "^6.0.2",
+    "@trustos/core": "workspace:*",
+    "@trustos/ontology": "workspace:*",
+    "fastify": "^5.2.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

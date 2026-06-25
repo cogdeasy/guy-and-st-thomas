@@ -1,0 +1,9 @@
+/* NHS-aligned CSS custom properties (consumed via Tailwind theme in apps/web). */
+:root {
+  --nhs-blue: #005eb8;
+  --nhs-darkblue: #003087;
+  --nhs-brightblue: #0072ce;
+  --nhs-green: #009639;
+  --nhs-red: #d5281b;
+  --nhs-yellow: #ffb81c;
+}
