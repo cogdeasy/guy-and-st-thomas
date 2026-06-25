@@ -150,6 +150,19 @@ export default defineModule({
       return task;
     };
 
+    // The ward-jobs board only surfaces Tasks this module owns (those paired
+    // with a TaskAssignment), so Tasks created by other modules via the
+    // generic /api/fhir/Task CRUD never leak onto the board.
+    const wardJobs = (): EnrichedTask[] =>
+      store
+        .list<TaskAssignment>('TaskAssignment')
+        .map((a) => {
+          const taskId = a.task.split('/')[1];
+          return taskId ? store.get<Task>('Task', taskId) : undefined;
+        })
+        .filter((t): t is Task => t !== undefined)
+        .map(enrich);
+
     // Reference data for the worklist filters and the create form.
     app.get('/teams', async () => ({ teams: TEAMS, jobTypes: JOB_TYPES }));
 
@@ -159,7 +172,7 @@ export default defineModule({
       '/worklist',
       async (req) => {
         const { team, owner, includeDone } = req.query;
-        let tasks = store.list<Task>('Task').map(enrich);
+        let tasks = wardJobs();
         if (!includeDone) tasks = tasks.filter((t) => OPEN_STATUSES.includes(t.status));
         if (team) tasks = tasks.filter((t) => t.team === team);
         if (owner) tasks = tasks.filter((t) => t.owner?.id === owner);
@@ -195,7 +208,7 @@ export default defineModule({
 
     // Open / overdue workload broken down by team and priority.
     app.get('/metrics', async () => {
-      const tasks = store.list<Task>('Task').map(enrich);
+      const tasks = wardJobs();
       const open = tasks.filter((t) => OPEN_STATUSES.includes(t.status));
       const since = isoHoursFromNow(-24);
       const completedToday = store.query<TaskAssignment>(
