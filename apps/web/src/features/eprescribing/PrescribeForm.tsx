@@ -79,7 +79,7 @@ export function PrescribeForm({ patientId, encounterId, formulary }: Props) {
         route,
         frequency,
         prn,
-        courseOfTherapyType: frequency === 'STAT' ? 'stat' : prn ? 'acute' : 'continuous',
+        courseOfTherapyType: frequency === 'STAT' ? 'stat' : 'acute',
         acknowledgeAllergy: acknowledge,
       },
       {
