@@ -58,6 +58,9 @@ export function VteAssessmentPage() {
     if (existing) {
       setRisk(new Set(existing.riskFactors));
       setBleeding(new Set(existing.bleedingRiskFactors));
+    } else {
+      setRisk(new Set());
+      setBleeding(new Set());
     }
   }, [existing]);
 

@@ -87,7 +87,8 @@ export default defineModule({
             assessment: assessment ?? null,
           };
         })
-        .sort((a, b) => Number(b.overdue) - Number(a.overdue));
+        // Most urgent first: overdue → pending (unassessed, within 24h) → assessed.
+        .sort((a, b) => rank(b) - rank(a));
 
       return {
         total: items.length,
@@ -213,6 +214,13 @@ export default defineModule({
     }
   },
 });
+
+/** Worklist urgency rank: overdue (2) > pending/unassessed (1) > assessed (0). */
+function rank(item: { assessed: boolean; overdue: boolean }): number {
+  if (item.overdue) return 2;
+  if (!item.assessed) return 1;
+  return 0;
+}
 
 /** Pick between `min` and `max` distinct items using the seeded rng. */
 function sample(items: readonly string[], rng: () => number, min: number, max: number): string[] {
