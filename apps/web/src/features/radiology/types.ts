@@ -51,6 +51,7 @@ export interface Worklist {
 
 export interface Metrics {
   total: number;
+  open: number;
   awaitingReport: number;
   urgentOutstanding: number;
   avgTurnaroundHours: number | null;

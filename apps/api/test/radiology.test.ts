@@ -46,8 +46,24 @@ describe('radiology module', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.total).toBeGreaterThan(0);
+    expect(body.open).toBeLessThanOrEqual(body.total);
     expect(body.byModality).toHaveLength(4);
     expect(body.byStatus).toHaveLength(4);
+  });
+
+  it('rejects acquiring a request that has not been scheduled', async () => {
+    const patients = await app.inject({ method: 'GET', url: '/api/fhir/Patient' });
+    const patientId = patients.json().entry[1].id as string;
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/radiology/request',
+      payload: { patientId, modality: 'XR', bodyPart: 'Chest', clinicalIndication: 'SOB' },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/radiology/${created.json().id}/acquire`,
+    });
+    expect(res.statusCode).toBe(400);
   });
 
   it('walks a request through the schedule -> report workflow', async () => {
@@ -84,6 +100,14 @@ describe('radiology module', () => {
     });
     expect(scheduled.statusCode).toBe(200);
     expect(scheduled.json().status).toBe('scheduled');
+
+    const acquired = await app.inject({
+      method: 'POST',
+      url: `/api/radiology/${request.id}/acquire`,
+    });
+    expect(acquired.statusCode).toBe(200);
+    expect(acquired.json().status).toBe('acquired');
+    expect(acquired.json().acquiredAt).toBeTruthy();
 
     const reported = await app.inject({
       method: 'POST',

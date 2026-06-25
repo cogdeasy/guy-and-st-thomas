@@ -47,7 +47,7 @@ export function RadiologyWorklistPage() {
       />
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Open requests" value={metrics.data?.total ?? '—'} />
+        <Stat label="Open requests" value={metrics.data?.open ?? '—'} hint="Not yet reported" />
         <Stat
           label="Awaiting report"
           value={metrics.data?.awaitingReport ?? '—'}

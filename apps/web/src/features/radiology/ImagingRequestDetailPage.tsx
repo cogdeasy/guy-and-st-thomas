@@ -32,6 +32,7 @@ export function ImagingRequestDetailPage() {
   const { data, isLoading } = useApiQuery<ImagingRequest>(id ? `/api/radiology/${id}` : null);
 
   const schedule = useApiMutation<{ scheduledFor: string }>('POST', () => `/api/radiology/${id}/schedule`);
+  const acquire = useApiMutation<Record<string, never>>('POST', () => `/api/radiology/${id}/acquire`);
   const report = useApiMutation<{ findings: string; impression: string }>(
     'POST',
     () => `/api/radiology/${id}/report`,
@@ -44,6 +45,7 @@ export function ImagingRequestDetailPage() {
   if (isLoading || !data) return <Spinner className="m-10" />;
 
   const canSchedule = data.status === 'requested';
+  const canAcquire = data.status === 'scheduled';
   const canReport = data.status === 'scheduled' || data.status === 'acquired';
 
   return (
@@ -118,6 +120,22 @@ export function ImagingRequestDetailPage() {
               </Button>
               {!canSchedule && data.status !== 'reported' && (
                 <p className="mt-1 text-xs text-slate-400">Already scheduled.</p>
+              )}
+            </div>
+
+            <div className="border-t border-slate-100 pt-4">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Acquisition
+              </label>
+              <Button
+                variant="secondary"
+                disabled={!canAcquire || acquire.isPending}
+                onClick={() => acquire.mutate({})}
+              >
+                {acquire.isPending ? 'Recording…' : 'Mark images acquired'}
+              </Button>
+              {data.status === 'acquired' && (
+                <p className="mt-1 text-xs text-slate-400">Images acquired — awaiting report.</p>
               )}
             </div>
           </CardBody>

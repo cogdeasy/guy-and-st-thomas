@@ -103,6 +103,19 @@ export default defineModule({
       return enrich(store, updated);
     });
 
+    // Record image acquisition (scheduled -> acquired).
+    app.post<{ Params: { id: string } }>('/:id/acquire', async (req) => {
+      const request = store.getOrThrow<ImagingRequest>('ImagingRequest', req.params.id);
+      if (request.status !== 'scheduled') {
+        throw BadRequest(`Cannot mark a request in status '${request.status}' as acquired`);
+      }
+      const updated = store.update<ImagingRequest>('ImagingRequest', request.id, {
+        status: 'acquired',
+        acquiredAt: nowIso(),
+      });
+      return enrich(store, updated);
+    });
+
     // Attach a report and finalise (scheduled|acquired -> reported).
     const ReportBody = z.object({
       reportedById: z.string().optional(),
@@ -154,6 +167,7 @@ export default defineModule({
 
       return {
         total: all.length,
+        open: all.filter((r) => r.status !== 'reported').length,
         awaitingReport: all.filter((r) => r.status === 'acquired').length,
         urgentOutstanding: all.filter((r) => r.priority !== 'routine' && r.status !== 'reported').length,
         avgTurnaroundHours,
