@@ -95,6 +95,7 @@ export function DischargeDetailPage() {
   const onComplete = async () => {
     await onSave();
     await complete.mutateAsync(undefined);
+    update({ status: 'completed' });
   };
 
   return (

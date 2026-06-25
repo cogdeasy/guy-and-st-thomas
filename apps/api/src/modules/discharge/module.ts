@@ -51,7 +51,7 @@ export default defineModule({
       ) as Record<DischargeStatus, number>;
 
       return {
-        total: items.length,
+        total: all.length,
         readyForDischarge: all.filter((i) => i.checklist.ready && i.status !== 'completed').length,
         byStatus,
         items,
@@ -127,6 +127,9 @@ export default defineModule({
         throw BadRequest('Discharge summary is completed and can no longer be edited');
       }
       const patch = UpdateBody.parse(req.body);
+      if (patch.status === 'completed') {
+        throw BadRequest('Use POST /:id/complete to finalise a discharge — it enforces the readiness checklist');
+      }
       return store.update<DischargeSummary>('DischargeSummary', existing.id, {
         ...patch,
         updatedAt: nowIso(),

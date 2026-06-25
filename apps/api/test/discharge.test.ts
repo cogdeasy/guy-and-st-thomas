@@ -103,6 +103,14 @@ describe('discharge module', () => {
     const tooEarly = await app.inject({ method: 'POST', url: `/api/discharge/${draft.id}/complete` });
     expect(tooEarly.statusCode).toBe(422);
 
+    // The edit endpoint cannot be used to bypass the completion checklist.
+    const sneaky = await app.inject({
+      method: 'PUT',
+      url: `/api/discharge/${draft.id}`,
+      payload: { status: 'completed' },
+    });
+    expect(sneaky.statusCode).toBe(400);
+
     // Fill in the required fields.
     const put = await app.inject({
       method: 'PUT',
