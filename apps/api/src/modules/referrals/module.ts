@@ -109,15 +109,20 @@ export default defineModule({
       async (req) => {
         const { status, priority, specialty } = req.query;
         const now = new Date();
-        let items = store.list<Referral>(REFERRAL).map((r) => toRttView(r, now));
+        const all = store.list<Referral>(REFERRAL).map((r) => toRttView(r, now));
+
+        let items = all;
         if (status) items = items.filter((r) => r.status === status);
         if (priority) items = items.filter((r) => r.priority === priority);
         if (specialty) items = items.filter((r) => r.toSpecialty === specialty);
-        items.sort((a, b) => b.daysElapsed - a.daysElapsed);
+        items = [...items].sort((a, b) => b.daysElapsed - a.daysElapsed);
 
-        const open = items.filter((r) => !r.clockStopped);
+        // Summary always reflects global totals so the dashboard stays stable
+        // regardless of the active worklist filters.
+        const open = all.filter((r) => !r.clockStopped);
         return {
-          total: items.length,
+          total: all.length,
+          filtered: items.length,
           open: open.length,
           breaches: open.filter((r) => r.breached).length,
           twoWeekWait: open.filter((r) => r.is2ww).length,
@@ -237,7 +242,9 @@ export default defineModule({
       const at = nowIso();
       return store.update<Referral>(REFERRAL, referral.id, {
         status: body.status,
-        clockStop: isClockStopped(body.status) ? at : referral.clockStop,
+        // Preserve an earlier clock-stop (e.g. the treatment date) when a
+        // treated pathway is later discharged — don't overwrite it.
+        clockStop: isClockStopped(body.status) ? (referral.clockStop ?? at) : referral.clockStop,
         history: [...referral.history, { status: body.status, at, note: body.note }],
       });
     });
@@ -304,8 +311,9 @@ export default defineModule({
         history.push({ status: 'treated', at: clockStop, note: 'First definitive treatment' });
       }
       if (status === 'discharged') {
+        // RTT clock stops at first treatment; discharge is later and must not
+        // overwrite the treatment-date clock-stop set above.
         const dischargedAt = isoDaysAgo(Math.max(0, weeksAgo * 7 - 28));
-        clockStop = dischargedAt;
         history.push({ status: 'discharged', at: dischargedAt, note: 'Discharged to primary care' });
       }
 
