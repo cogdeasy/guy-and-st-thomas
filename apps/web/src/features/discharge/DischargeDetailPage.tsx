@@ -79,14 +79,16 @@ export function DischargeDetailPage() {
       f ? { ...f, ttoMeds: f.ttoMeds.map((m, i) => (i === index ? { ...m, ...patch } : m)) } : f,
     );
 
+  // Only commit the new form state once the server confirms the write, so a
+  // failed save never leaves the screen out of sync with the backend.
   const onSave = async (status?: DischargeStatus) => {
     const next: FormState = {
       ...form,
       ttoMeds: form.ttoMeds.filter((m) => m.medication.trim()),
       status: status ?? form.status,
     };
-    setForm(next);
     await save.mutateAsync(next);
+    setForm(next);
     return next;
   };
 
@@ -96,6 +98,12 @@ export function DischargeDetailPage() {
     await onSave();
     await complete.mutateAsync(undefined);
     update({ status: 'completed' });
+  };
+
+  const run = (action: () => Promise<unknown>) => () => {
+    void action().catch(() => {
+      /* errors surface via save.isError / complete.isError banners */
+    });
   };
 
   return (
@@ -230,14 +238,14 @@ export function DischargeDetailPage() {
           {!readOnly && (
             <Card>
               <CardBody className="space-y-3">
-                <Button className="w-full" onClick={() => onSave()} disabled={save.isPending}>
+                <Button className="w-full" onClick={run(() => onSave())} disabled={save.isPending}>
                   {save.isPending ? 'Saving…' : 'Save changes'}
                 </Button>
                 {form.status === 'draft' && (
                   <Button
                     variant="secondary"
                     className="w-full"
-                    onClick={() => onSave('pending-pharmacy')}
+                    onClick={run(() => onSave('pending-pharmacy'))}
                     disabled={save.isPending}
                   >
                     Send to pharmacy
@@ -247,12 +255,14 @@ export function DischargeDetailPage() {
                   variant="primary"
                   className="w-full bg-nhs-green hover:bg-nhs-green/90"
                   disabled={!checklist.ready || save.isPending || complete.isPending}
-                  onClick={onComplete}
+                  onClick={run(onComplete)}
                 >
                   {complete.isPending ? 'Completing…' : 'Complete discharge'}
                 </Button>
-                {complete.isError && (
-                  <p className="text-xs text-nhs-red">{(complete.error as Error).message}</p>
+                {(save.isError || complete.isError) && (
+                  <p className="text-xs text-nhs-red">
+                    {((complete.error ?? save.error) as Error).message}
+                  </p>
                 )}
                 <p className="text-xs text-slate-400">
                   Completing finishes the inpatient encounter and locks this summary.
