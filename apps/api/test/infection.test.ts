@@ -49,6 +49,22 @@ describe('infection module', () => {
     expect(body.isolation.sideRoomsAvailable).toBeGreaterThanOrEqual(0);
   });
 
+  it('includes ad-hoc organisms in the metrics breakdown so it always sums to activeCases', async () => {
+    const patients = await app.inject({ method: 'GET', url: '/api/fhir/Patient' });
+    const patientId = patients.json().entry[1].id as string;
+    await app.inject({
+      method: 'POST',
+      url: '/api/infection/alerts',
+      payload: { patientId, organism: 'RSV', type: 'infection' },
+    });
+
+    const res = await app.inject({ method: 'GET', url: '/api/infection/metrics' });
+    const body = res.json();
+    const sum = body.byOrganism.reduce((acc: number, o: { total: number }) => acc + o.total, 0);
+    expect(sum).toBe(body.activeCases);
+    expect(body.byOrganism.some((o: { organism: string }) => o.organism === 'RSV')).toBe(true);
+  });
+
   it('raises a new alert against an existing patient', async () => {
     const patients = await app.inject({ method: 'GET', url: '/api/fhir/Patient' });
     const patientId = patients.json().entry[0].id as string;

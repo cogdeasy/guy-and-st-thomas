@@ -31,7 +31,7 @@ export const ORGANISMS = [
   { name: 'ESBL', isolation: false },
 ] as const;
 
-const ORGANISM_NAMES = ORGANISMS.map((o) => o.name);
+const ORGANISM_NAMES: string[] = ORGANISMS.map((o) => o.name);
 
 /** Side rooms available per ward for cohort/isolation use (capacity model). */
 const SIDE_ROOMS_PER_WARD = 2;
@@ -91,15 +91,23 @@ export default defineModule({
     // Surveillance metrics: organism breakdown + isolation demand vs capacity.
     app.get('/metrics', async () => {
       const alerts = activeAlerts(store);
-      const byOrganism = ORGANISM_NAMES.map((organism) => {
-        const cases = alerts.filter((a) => a.organism === organism);
-        return {
-          organism,
-          total: cases.length,
-          infection: cases.filter((a) => a.type === 'infection').length,
-          colonisation: cases.filter((a) => a.type === 'colonisation').length,
-        };
-      })
+      // Cover every organism actually present (incl. ad-hoc ones from POST /alerts),
+      // keeping the surveillance list ordered first so the breakdown always sums to
+      // activeCases.
+      const organisms = [
+        ...ORGANISM_NAMES,
+        ...alerts.map((a) => a.organism).filter((o) => !ORGANISM_NAMES.includes(o)),
+      ];
+      const byOrganism = [...new Set(organisms)]
+        .map((organism) => {
+          const cases = alerts.filter((a) => a.organism === organism);
+          return {
+            organism,
+            total: cases.length,
+            infection: cases.filter((a) => a.type === 'infection').length,
+            colonisation: cases.filter((a) => a.type === 'colonisation').length,
+          };
+        })
         .filter((o) => o.total > 0)
         .sort((a, b) => b.total - a.total);
 
