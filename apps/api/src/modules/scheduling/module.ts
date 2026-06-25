@@ -263,7 +263,7 @@ export default defineModule({
 
     // Weekday window around today so demos always show past + upcoming clinics.
     const dayOffsets: number[] = [];
-    for (let d = -4; d <= 4 && dayOffsets.length < 14; d++) {
+    for (let d = -4; d <= 4; d++) {
       if (isWeekday(d)) dayOffsets.push(d);
     }
 
@@ -326,7 +326,9 @@ export default defineModule({
             location: session.location,
             description: `${session.name} appointment`,
           });
-          slot.appointmentId = appointment.id;
+          // A cancelled appointment frees its slot for rebooking, mirroring the
+          // POST /:id/status cancel handler; the record is kept as an audit trail.
+          slot.appointmentId = status === 'cancelled' ? null : appointment.id;
         }
         store.update('ClinicSession', session.id, { slots: session.slots });
       }
