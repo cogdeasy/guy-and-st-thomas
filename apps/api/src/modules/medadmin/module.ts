@@ -22,6 +22,7 @@ import {
   type FormularyEntry,
   hashId,
   isFrequencyCode,
+  nearestSlot,
   omissionReason,
   scheduleSlots,
   slotId,
@@ -99,9 +100,11 @@ export default defineModule({
       );
 
       const items: RoundItem[] = [];
+      const seen = new Set<string>();
       for (const encounter of encounters) {
         const patientId = encounter.subject?.reference?.split('/')[1];
-        if (!patientId) continue;
+        if (!patientId || seen.has(patientId)) continue;
+        seen.add(patientId);
         const patient = store.get<Patient>('Patient', patientId);
         if (!patient) continue;
         const ward = wardForPatient(patientId, wards);
@@ -145,7 +148,6 @@ export default defineModule({
       scheduledTime: z.string().datetime({ offset: true }).optional(),
       status: z.enum(['given', 'omitted']),
       reasonCode: z.string().optional(),
-      note: z.string().max(500).optional(),
       performerId: z.string().optional(),
     });
 
@@ -155,6 +157,30 @@ export default defineModule({
       if (!mr) throw NotFound(`MedicationRequest/${body.medicationRequestId}`);
       if (mr.status !== 'active') {
         throw BadRequest(`MedicationRequest/${mr.id} is not active (status: ${mr.status})`);
+      }
+
+      // Idempotency: refuse to record the same scheduled dose twice.
+      if (body.scheduledTime) {
+        const target = Date.parse(body.scheduledTime);
+        const slots = scheduleSlots(
+          frequencyCode(mr),
+          new Date(target - MATCH_WINDOW_MS),
+          new Date(target + MATCH_WINDOW_MS),
+          new Date(target),
+        );
+        const targetSlot = nearestSlot(slots, target)?.slot ?? body.scheduledTime;
+        const alreadyRecorded = store
+          .query<MedicationAdministration>(
+            'MedicationAdministration',
+            (a) => a.request?.reference === ref('MedicationRequest', mr.id),
+          )
+          .some((a) => {
+            const match = nearestSlot(slots, Date.parse(a.effectiveDateTime));
+            return match !== null && match.dist <= MATCH_WINDOW_MS && match.slot === targetSlot;
+          });
+        if (alreadyRecorded) {
+          throw BadRequest('This dose has already been recorded for the selected time');
+        }
       }
 
       let reason: { code: string; display: string } | undefined;
@@ -184,11 +210,7 @@ export default defineModule({
       });
 
       reply.code(201);
-      return {
-        administration: created,
-        scheduledTime: body.scheduledTime ?? null,
-        note: body.note ?? null,
-      };
+      return { administration: created, scheduledTime: body.scheduledTime ?? null };
     });
 
     // Full administration history (given + omitted) for one patient.

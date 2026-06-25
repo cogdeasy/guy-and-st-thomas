@@ -193,6 +193,23 @@ export function slotStatus(
   return 'overdue';
 }
 
+/** Find the scheduled slot closest to a given time, with the gap in ms. */
+export function nearestSlot(
+  slots: string[],
+  timeMs: number,
+): { slot: string; dist: number } | null {
+  let best: string | undefined;
+  let bestDist = Infinity;
+  for (const slot of slots) {
+    const dist = Math.abs(Date.parse(slot) - timeMs);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = slot;
+    }
+  }
+  return best ? { slot: best, dist: bestDist } : null;
+}
+
 /** Stable, dependency-free hash used to assign patients to a notional ward. */
 export function hashId(value: string): number {
   let hash = 0;

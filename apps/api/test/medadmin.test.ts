@@ -142,6 +142,23 @@ describe('medadmin module', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('rejects recording the same scheduled dose twice', async () => {
+    const round = await app.inject({ method: 'GET', url: '/api/medadmin/round' });
+    const alreadyGiven = round.json().items.find((i: { status: string }) => i.status === 'given');
+    expect(alreadyGiven).toBeTruthy();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/medadmin/administer',
+      payload: {
+        medicationRequestId: alreadyGiven.medicationRequestId,
+        scheduledTime: alreadyGiven.scheduledTime,
+        status: 'given',
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it('404s when administering against an unknown prescription', async () => {
     const res = await app.inject({
       method: 'POST',
