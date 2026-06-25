@@ -289,6 +289,10 @@ function seedOrders(ctx: ModuleContext): void {
     if (!patient) return;
 
     const component = pick(BLOOD_COMPONENTS, rng);
+
+    // Derive each step's "hours ago" from the previous one so the timeline is
+    // always chronological (request → crossmatch → issue → transfuse).
+    let hoursAgo = randInt(48, 96, rng);
     const order: Omit<TransfusionOrder, 'id'> = {
       patient: { reference: ref('Patient', patient.id), display: patientName(patient) },
       encounter: { reference: ref('Encounter', encounter.id) },
@@ -299,12 +303,20 @@ function seedOrders(ctx: ModuleContext): void {
       priority: pick(PRIORITIES, rng),
       groupAndSave: true,
       status,
-      requestedAt: isoHoursFromNow(-randInt(6, 72, rng)),
+      requestedAt: isoHoursFromNow(-hoursAgo),
     };
-    if (status !== 'requested') order.crossmatchedAt = isoHoursFromNow(-randInt(4, 24, rng));
-    if (status === 'issued' || status === 'transfused')
-      order.issuedAt = isoHoursFromNow(-randInt(2, 8, rng));
-    if (status === 'transfused') order.transfusedAt = isoHoursFromNow(-randInt(1, 4, rng));
+    if (status !== 'requested') {
+      hoursAgo -= randInt(4, 12, rng);
+      order.crossmatchedAt = isoHoursFromNow(-hoursAgo);
+    }
+    if (status === 'issued' || status === 'transfused') {
+      hoursAgo -= randInt(2, 8, rng);
+      order.issuedAt = isoHoursFromNow(-hoursAgo);
+    }
+    if (status === 'transfused') {
+      hoursAgo -= randInt(1, 4, rng);
+      order.transfusedAt = isoHoursFromNow(-hoursAgo);
+    }
 
     store.create<TransfusionOrder>(TRANSFUSION_ORDER_COLLECTION, order);
   });
