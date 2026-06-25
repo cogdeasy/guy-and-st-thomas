@@ -87,7 +87,7 @@ export function ReferralWorklistPage() {
         <div className="lg:col-span-2">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              RTT worklist ({worklist.data?.total ?? 0})
+              RTT worklist ({worklist.data?.filtered ?? worklist.data?.total ?? 0})
             </h2>
             <div className="flex gap-2">
               <FilterSelect value={status} onChange={setStatus} options={STATUS_FILTERS} />

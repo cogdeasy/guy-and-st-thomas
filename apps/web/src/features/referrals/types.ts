@@ -47,6 +47,7 @@ export interface RttView {
 
 export interface Worklist {
   total: number;
+  filtered: number;
   open: number;
   breaches: number;
   twoWeekWait: number;
