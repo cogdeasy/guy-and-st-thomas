@@ -63,6 +63,20 @@ export default defineModule({
   collections: [{ name: 'EdAttendance', validator: (i) => EdAttendanceSchema.parse(i) }],
 
   routes(app, { store }) {
+    /** Keep the linked emergency Encounter's status in step with the attendance. */
+    const syncEncounterStatus = (att: EdAttendance, status: EdStatus, endIso?: string) => {
+      if (!att.encounter) return;
+      const encId = att.encounter.split('/')[1] ?? '';
+      const enc = store.get<Encounter>('Encounter', encId);
+      if (!enc) return;
+      store.update<Encounter>('Encounter', encId, {
+        status: ENCOUNTER_STATUS[status],
+        ...(endIso
+          ? { period: { ...enc.period, start: enc.period?.start ?? att.arrivalTime, end: endIso } }
+          : {}),
+      });
+    };
+
     /** Enrich a stored attendance with patient/clinician detail and the breach clock. */
     const present = (att: EdAttendance, now: number) => {
       const patient = store.get<Patient>('Patient', att.patient.split('/')[1] ?? '');
@@ -178,9 +192,10 @@ export default defineModule({
         throw NotFound(`Practitioner/${body.assignedClinicianId}`);
       }
 
+      const nextStatus: EdStatus = existing.status === 'waiting' ? 'triaged' : existing.status;
       const patch: Partial<EdAttendance> = {
         acuity: body.acuity,
-        status: existing.status === 'waiting' ? 'triaged' : existing.status,
+        status: nextStatus,
         triageTime: existing.triageTime ?? new Date().toISOString(),
       };
       if (clinician) {
@@ -188,6 +203,8 @@ export default defineModule({
         patch.assignedClinicianName = fullName(clinician);
       }
       if (body.cubicle) patch.cubicle = body.cubicle;
+
+      if (nextStatus !== existing.status) syncEncounterStatus(existing, nextStatus);
 
       return store.update<EdAttendance>('EdAttendance', existing.id, patch);
     });
@@ -213,20 +230,12 @@ export default defineModule({
       if (body.status === 'in-treatment' && !existing.treatmentStartTime) {
         patch.treatmentStartTime = nowIso;
       }
-      if (body.status === 'discharged') patch.dischargeTime = nowIso;
+      // Stamp the discharge time once, so a repeated discharge POST is idempotent.
+      const dischargeIso =
+        body.status === 'discharged' ? (existing.dischargeTime ?? nowIso) : undefined;
+      if (dischargeIso && !existing.dischargeTime) patch.dischargeTime = dischargeIso;
 
-      if (existing.encounter) {
-        const encId = existing.encounter.split('/')[1] ?? '';
-        const enc = store.get<Encounter>('Encounter', encId);
-        if (enc) {
-          store.update<Encounter>('Encounter', encId, {
-            status: ENCOUNTER_STATUS[body.status],
-            ...(body.status === 'discharged'
-              ? { period: { ...enc.period, start: enc.period?.start ?? existing.arrivalTime, end: nowIso } }
-              : {}),
-          });
-        }
-      }
+      if (body.status !== existing.status) syncEncounterStatus(existing, body.status, dischargeIso);
 
       return store.update<EdAttendance>('EdAttendance', existing.id, patch);
     });

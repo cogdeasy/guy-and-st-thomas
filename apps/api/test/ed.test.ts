@@ -108,6 +108,11 @@ describe('ed module', () => {
     expect(triaged.acuity).toBe(2);
     expect(triaged.status).toBe('triaged');
     expect(triaged.cubicle).toBe('Majors 3');
+
+    // The linked emergency Encounter should move from 'arrived' to 'triaged'.
+    const encId = (triaged.encounter as string).split('/')[1];
+    const enc = await app.inject({ method: 'GET', url: `/api/fhir/Encounter/${encId}` });
+    expect(enc.json().status).toBe('triaged');
   });
 
   it('validates the triage acuity range', async () => {
@@ -153,7 +158,17 @@ describe('ed module', () => {
       payload: { status: 'discharged' },
     });
     expect(discharge.statusCode).toBe(200);
-    expect(discharge.json().dischargeTime).toBeTruthy();
+    const dischargeTime = discharge.json().dischargeTime as string;
+    expect(dischargeTime).toBeTruthy();
+
+    // Re-posting the same status is idempotent and must not move the discharge time.
+    const repeat = await app.inject({
+      method: 'POST',
+      url: `/api/ed/${id}/status`,
+      payload: { status: 'discharged' },
+    });
+    expect(repeat.statusCode).toBe(200);
+    expect(repeat.json().dischargeTime).toBe(dischargeTime);
 
     // discharged is terminal — no further transitions allowed.
     const illegal = await app.inject({
