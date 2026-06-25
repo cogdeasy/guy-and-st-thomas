@@ -36,25 +36,23 @@ export default defineModule({
     // Worklist of patients in the discharge pipeline with checklist completeness.
     app.get<{ Querystring: { status?: string } }>('/worklist', async (req) => {
       const filter = req.query.status?.trim();
-      let summaries = store.list<DischargeSummary>('DischargeSummary');
-      if (filter) {
-        if (!DISCHARGE_STATUSES.includes(filter as DischargeStatus)) {
-          throw BadRequest(`Unknown status filter: ${filter}`);
-        }
-        summaries = summaries.filter((s) => s.status === filter);
+      if (filter && !DISCHARGE_STATUSES.includes(filter as DischargeStatus)) {
+        throw BadRequest(`Unknown status filter: ${filter}`);
       }
 
-      const items = summaries
-        .map((s) => toWorklistItem(store, s))
-        .sort((a, b) => a.checklist.complete - b.checklist.complete);
+      // Aggregate stats always reflect the whole pipeline; only the rows are filtered.
+      const all = store.list<DischargeSummary>('DischargeSummary').map((s) => toWorklistItem(store, s));
+      const items = (filter ? all.filter((i) => i.status === filter) : all).sort(
+        (a, b) => a.checklist.complete - b.checklist.complete,
+      );
 
       const byStatus = Object.fromEntries(
-        DISCHARGE_STATUSES.map((st) => [st, summaries.filter((s) => s.status === st).length]),
+        DISCHARGE_STATUSES.map((st) => [st, all.filter((i) => i.status === st).length]),
       ) as Record<DischargeStatus, number>;
 
       return {
         total: items.length,
-        readyForDischarge: items.filter((i) => i.checklist.ready && i.status !== 'completed').length,
+        readyForDischarge: all.filter((i) => i.checklist.ready && i.status !== 'completed').length,
         byStatus,
         items,
       };

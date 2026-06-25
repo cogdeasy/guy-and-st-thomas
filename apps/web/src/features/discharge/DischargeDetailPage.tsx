@@ -79,10 +79,22 @@ export function DischargeDetailPage() {
       f ? { ...f, ttoMeds: f.ttoMeds.map((m, i) => (i === index ? { ...m, ...patch } : m)) } : f,
     );
 
-  const onSave = (status?: DischargeStatus) => {
-    const ttoMeds = form.ttoMeds.filter((m) => m.medication.trim());
-    save.mutate({ ...form, ttoMeds, status: status ?? form.status });
-    if (status) update({ status });
+  const onSave = async (status?: DischargeStatus) => {
+    const next: FormState = {
+      ...form,
+      ttoMeds: form.ttoMeds.filter((m) => m.medication.trim()),
+      status: status ?? form.status,
+    };
+    setForm(next);
+    await save.mutateAsync(next);
+    return next;
+  };
+
+  // Persist the current form before completing so the backend validates the
+  // checklist against the edits the clinician can see on screen.
+  const onComplete = async () => {
+    await onSave();
+    await complete.mutateAsync(undefined);
   };
 
   return (
@@ -233,8 +245,8 @@ export function DischargeDetailPage() {
                 <Button
                   variant="primary"
                   className="w-full bg-nhs-green hover:bg-nhs-green/90"
-                  disabled={!checklist.ready || complete.isPending}
-                  onClick={() => complete.mutate(undefined)}
+                  disabled={!checklist.ready || save.isPending || complete.isPending}
+                  onClick={onComplete}
                 >
                   {complete.isPending ? 'Completing…' : 'Complete discharge'}
                 </Button>
