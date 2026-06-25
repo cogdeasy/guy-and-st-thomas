@@ -8,6 +8,7 @@ import {
   ED_TARGET_COMPLIANCE,
   edAttendances,
   edStats,
+  isAdmission,
   LocationIndex,
   news2ForEncounter,
   patientName,
@@ -44,8 +45,9 @@ export default defineModule({
       const deteriorating = scored.filter((x) => x.news2.score >= 5).length;
 
       const allEncounters = store.list<Encounter>('Encounter');
-      const admissionsToday = allEncounters.filter((e) => sameUtcDay(e.period?.start, now)).length;
-      const dischargesToday = allEncounters.filter(
+      const admissions = allEncounters.filter(isAdmission);
+      const admissionsToday = admissions.filter((e) => sameUtcDay(e.period?.start, now)).length;
+      const dischargesToday = admissions.filter(
         (e) => e.status === 'finished' && sameUtcDay(e.period?.end, now),
       ).length;
 
@@ -89,20 +91,20 @@ export default defineModule({
       const ed = edAttendances(store);
       const allEncounters = store.list<Encounter>('Encounter');
 
+      const admissions = allEncounters.filter(isAdmission);
       const sites = index.sites.map((site) => {
-        const onSite = (e: Encounter) => refId(e.location?.reference) === site.id;
+        const onSite = (e: Encounter) => index.siteIdOf(e.location?.reference) === site.id;
         const siteEd = ed.filter(onSite);
+        const siteAdmissions = admissions.filter(onSite);
         return {
           siteId: site.id,
           site: site.name,
           beds: index.bedStatsForSite(site.id),
           activity: {
             activeInpatients: inpatients.filter(onSite).length,
-            admissionsToday: allEncounters.filter(
-              (e) => onSite(e) && sameUtcDay(e.period?.start, now),
-            ).length,
-            dischargesToday: allEncounters.filter(
-              (e) => onSite(e) && e.status === 'finished' && sameUtcDay(e.period?.end, now),
+            admissionsToday: siteAdmissions.filter((e) => sameUtcDay(e.period?.start, now)).length,
+            dischargesToday: siteAdmissions.filter(
+              (e) => e.status === 'finished' && sameUtcDay(e.period?.end, now),
             ).length,
             edAttendances: siteEd.length,
             edBreaches: edStats(siteEd, now.getTime()).breaches,

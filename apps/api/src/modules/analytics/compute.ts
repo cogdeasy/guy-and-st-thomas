@@ -19,6 +19,18 @@ export const ED_TARGET_HOURS = 4;
 /** NHS A&E four-hour standard: 95% of attendances admitted/discharged in 4h. */
 export const ED_TARGET_COMPLIANCE = 95;
 
+/**
+ * Encounter classes that count as an "admission" in NHS flow reporting.
+ * Emergency/outpatient/virtual/home attendances are tracked separately and are
+ * deliberately excluded so ED activity is not double-counted as admissions.
+ */
+const ADMISSION_CLASSES = new Set(['inpatient', 'daycase']);
+
+/** Whether an encounter represents an inpatient/daycase admission. */
+export function isAdmission(e: Encounter): boolean {
+  return ADMISSION_CLASSES.has(e.class);
+}
+
 export interface BedStats {
   total: number;
   occupied: number;
@@ -98,6 +110,11 @@ export class LocationIndex {
       cur = this.get(refId(cur.partOf?.reference));
     }
     return undefined;
+  }
+
+  /** Resolve an arbitrary location reference to its owning site id. */
+  siteIdOf(reference: string | undefined): string | undefined {
+    return this.siteOf(this.get(refId(reference)))?.id;
   }
 
   bedStatsForSite(siteId: string): BedStats {
@@ -244,6 +261,7 @@ export function admissionTrends(store: DataStore, days = 7, now = new Date()): T
     let admissions = 0;
     let discharges = 0;
     for (const e of encounters) {
+      if (!isAdmission(e)) continue;
       if (sameUtcDay(e.period?.start, day)) admissions++;
       if (e.status === 'finished' && sameUtcDay(e.period?.end, day)) discharges++;
     }
