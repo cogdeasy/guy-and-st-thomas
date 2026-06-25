@@ -297,7 +297,7 @@ export default defineModule({
           : undefined;
       const dischargeTime =
         status === 'discharged'
-          ? new Date(now - Math.floor(rng() * 30) * 60000).toISOString()
+          ? new Date(now - Math.floor(rng() * Math.min(30, arrivalMinAgo)) * 60000).toISOString()
           : undefined;
 
       const clinician =

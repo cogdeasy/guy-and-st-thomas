@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app';
+import type { DataStore, Entity } from '../src/store/store';
 
 interface BoardAttendance {
   id: string;
@@ -11,16 +12,32 @@ interface BoardAttendance {
   breach: { elapsedMinutes: number; minutesToBreach: number; breached: boolean };
 }
 
+interface SeededAttendance extends Entity {
+  arrivalTime: string;
+  dischargeTime?: string;
+}
+
 describe('ed module', () => {
   let app: FastifyInstance;
+  let store: DataStore;
 
   beforeAll(async () => {
-    ({ app } = await buildApp({ logger: false, seed: true }));
+    ({ app, store } = await buildApp({ logger: false, seed: true }));
     await app.ready();
   });
 
   afterAll(async () => {
     await app.close();
+  });
+
+  it('seeds chronologically-valid attendances (discharge never precedes arrival)', () => {
+    const seeded = store.list<SeededAttendance>('EdAttendance');
+    expect(seeded.length).toBeGreaterThan(0);
+    for (const a of seeded) {
+      if (a.dischargeTime) {
+        expect(Date.parse(a.dischargeTime)).toBeGreaterThanOrEqual(Date.parse(a.arrivalTime));
+      }
+    }
   });
 
   it('registers the module', async () => {
