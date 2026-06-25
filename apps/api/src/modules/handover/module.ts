@@ -205,6 +205,8 @@ export default defineModule({
         if (existing.has(patientRef)) continue;
         const patient = store.get<Patient>('Patient', patientIdFromRef(patientRef));
         if (!patient) continue;
+        // Guard against a patient with more than one active inpatient encounter.
+        existing.add(patientRef);
 
         const news2 = patientNews2(store, patient.id);
         const problems = activeProblems(store, patient.id);
