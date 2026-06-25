@@ -74,6 +74,9 @@ export function NewOrderPage() {
         placedCount += 1;
         setBasket((prev) => prev.filter((b) => b.id !== item.id));
       }
+    } catch {
+      // Error is already surfaced to the user via placeOrder.isError / placeOrder.error.
+      return;
     } finally {
       if (placedCount > 0) setPlaced(placedCount);
     }
