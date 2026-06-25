@@ -142,22 +142,28 @@ export default defineModule({
     });
 
     // Trust-wide deteriorating patients (latest NEWS2 ≥ 5), highest first.
+    // Scoped to currently admitted inpatients so discharged patients with
+    // historical high scores never surface on the live worklist.
     app.get<{ Querystring: { threshold?: string } }>('/deteriorating', async (req) => {
       const threshold = Number(req.query.threshold ?? 5);
-      const patients = store.list<Patient>('Patient');
+      const encounters = store.query<Encounter>(
+        'Encounter',
+        (e) => e.class === 'inpatient' && e.status === 'in-progress',
+      );
 
-      const rows = patients
-        .map((patient) => {
-          const patientRef = ref('Patient', patient.id);
+      const rows = encounters
+        .map((encounter) => {
+          const patientRef = encounter.subject.reference;
+          const patient = store.get<Patient>('Patient', patientRef.split('/')[1] ?? '');
+          if (!patient) return null;
           const observations = store.query<Observation>('Observation', (o) => o.subject?.reference === patientRef);
           const latest = latestScoredSet(observations);
           if (!latest?.news2) return null;
-          const encounter = activeInpatientEncounter(store, patientRef);
           return {
             patient,
-            encounterId: encounter?.reference?.split('/')[1],
-            ward: encounterDisplay(store, encounter?.reference),
-            specialty: specialtyFor(store, patientRef),
+            encounterId: encounter.id,
+            ward: encounter.location?.display ?? encounter.reasonText,
+            specialty: encounter.specialty,
             news2: latest.news2.score,
             risk: latest.news2.risk,
             recommendation: latest.news2.recommendation,
@@ -254,22 +260,12 @@ function activeInpatientEncounter(
   patientRef: string,
 ): { reference: string } | undefined {
   const encounter = store
-    .query<Encounter>('Encounter', (e) => e.subject?.reference === patientRef && e.status === 'in-progress')
+    .query<Encounter>(
+      'Encounter',
+      (e) => e.subject?.reference === patientRef && e.class === 'inpatient' && e.status === 'in-progress',
+    )
     .sort((a, b) => (b.period?.start ?? '').localeCompare(a.period?.start ?? ''))[0];
   return encounter ? { reference: ref('Encounter', encounter.id) } : undefined;
-}
-
-function specialtyFor(store: DataStore, patientRef: string): string | undefined {
-  return store
-    .query<Encounter>('Encounter', (e) => e.subject?.reference === patientRef && e.status === 'in-progress')
-    .map((e) => e.specialty)
-    .find(Boolean);
-}
-
-function encounterDisplay(store: DataStore, encounterRef?: string): string | undefined {
-  if (!encounterRef) return undefined;
-  const encounter = store.get<Encounter>('Encounter', encounterRef.split('/')[1] ?? '');
-  return encounter?.location?.display ?? encounter?.reasonText;
 }
 
 /** Map a NEWS2 score to the RCP escalation/monitoring response. */
@@ -281,7 +277,7 @@ function escalationFor(score: number, risk: string): { band: string; monitoring:
       response: 'Emergency assessment by a critical-care-competent team; consider transfer to higher level of care.',
     };
   }
-  if (score >= 5) {
+  if (score >= 5 || risk === 'medium') {
     return {
       band: 'Medium',
       monitoring: 'Minimum hourly observations',
