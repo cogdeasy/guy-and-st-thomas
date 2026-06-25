@@ -338,9 +338,12 @@ function transition(
 }
 
 function sortKey(e: EnrichedRecord): number {
-  const priorityWeight = e.record.priority === 'stat' ? 3 : e.record.priority === 'urgent' ? 2 : 1;
-  const allergyWeight = e.allergyConflicts.length > 0 ? 1000 : 0;
-  return allergyWeight + priorityWeight * 100 + e.waitingMinutes;
+  // Strict tiers: an allergy conflict always outranks priority, which always
+  // outranks waiting time (waiting only breaks ties within the same band).
+  const priorityWeight =
+    e.record.priority === 'stat' ? 3 : e.record.priority === 'urgent' || e.record.priority === 'asap' ? 2 : 1;
+  const allergyWeight = e.allergyConflicts.length > 0 ? 1 : 0;
+  return allergyWeight * 1_000_000_000 + priorityWeight * 1_000_000 + Math.min(e.waitingMinutes, 999_999);
 }
 
 function patientDisplay(patient: Patient): string {
