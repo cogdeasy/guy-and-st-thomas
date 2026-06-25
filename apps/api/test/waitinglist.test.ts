@@ -89,6 +89,28 @@ describe('waitinglist module', () => {
     expect(tci.json().status).toBe('tci');
   });
 
+  it('admits a patient and drops them off the active list', async () => {
+    const ptl = await app.inject({ method: 'GET', url: '/api/waitinglist/ptl' });
+    const id = ptl.json().items[0].id as string;
+
+    const admitted = await app.inject({ method: 'POST', url: `/api/waitinglist/${id}/admit`, payload: {} });
+    expect(admitted.statusCode).toBe(200);
+    expect(admitted.json().status).toBe('admitted');
+    expect(admitted.json().admittedDate).toBeTruthy();
+
+    // No longer on the active worklist.
+    const after = await app.inject({ method: 'GET', url: '/api/waitinglist/ptl' });
+    expect((after.json().items as Array<{ id: string }>).some((i) => i.id === id)).toBe(false);
+
+    // Cannot schedule a TCI for an admitted patient.
+    const tci = await app.inject({
+      method: 'POST',
+      url: `/api/waitinglist/${id}/tci`,
+      payload: { tciDate: new Date().toISOString() },
+    });
+    expect(tci.statusCode).toBe(400);
+  });
+
   it('removes an entry from the list', async () => {
     const ptl = await app.inject({ method: 'GET', url: '/api/waitinglist/ptl' });
     const id = ptl.json().items[0].id as string;

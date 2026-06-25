@@ -72,6 +72,7 @@ export function WaitingListPage() {
     'POST',
     (body) => `/api/waitinglist/${body.id}/remove`,
   );
+  const admit = useApiMutation<{ id: string }>('POST', (body) => `/api/waitinglist/${body.id}/admit`);
 
   const specialties = useMemo(
     () => (metrics.data?.bySpecialty ?? []).map((s) => s.specialty),
@@ -185,10 +186,18 @@ export function WaitingListPage() {
                         {r.status === 'tci' ? 'Re-book TCI' : 'Schedule TCI'}
                       </Button>
                       <Button
+                        variant="primary"
+                        className="px-3 py-1 text-xs"
+                        disabled={admit.isPending}
+                        onClick={() => admit.mutate({ id: r.id })}
+                      >
+                        Admit
+                      </Button>
+                      <Button
                         variant="ghost"
                         className="px-3 py-1 text-xs text-red-600 hover:bg-red-50"
                         disabled={remove.isPending}
-                        onClick={() => remove.mutate({ id: r.id, reason: 'Treated / admitted' })}
+                        onClick={() => remove.mutate({ id: r.id, reason: 'Removed from list' })}
                       >
                         Remove
                       </Button>

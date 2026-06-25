@@ -49,6 +49,7 @@ interface WaitingListEntry {
   targetDate: string;
   status: Status;
   tciDate?: string;
+  admittedDate?: string;
   removalReason?: string;
   meta?: Record<string, unknown>;
   [key: string]: unknown;
@@ -67,6 +68,7 @@ const WaitingListEntrySchema = z
     targetDate: z.string(),
     status: z.enum(STATUSES),
     tciDate: z.string().optional(),
+    admittedDate: z.string().optional(),
     removalReason: z.string().optional(),
   })
   .passthrough();
@@ -200,9 +202,27 @@ export default defineModule({
     const TciBody = z.object({ tciDate: z.string().min(1) });
     app.post<{ Params: { id: string }; Body: unknown }>('/:id/tci', async (req) => {
       const entry = get(req.params.id);
-      if (entry.status === 'removed') throw BadRequest('Cannot schedule a removed entry');
+      if (entry.status === 'removed' || entry.status === 'admitted') {
+        throw BadRequest(`Cannot schedule a ${entry.status} entry`);
+      }
       const { tciDate } = TciBody.parse(req.body);
       const updated = store.update<WaitingListEntry>(COLLECTION, entry.id, { status: 'tci', tciDate });
+      return decorate(updated);
+    });
+
+    // Admit the patient — completes the pathway (waiting/tci -> admitted), which
+    // stops the RTT clock and drops them off the active tracking list.
+    const AdmitBody = z.object({ admittedDate: z.string().optional() });
+    app.post<{ Params: { id: string }; Body: unknown }>('/:id/admit', async (req) => {
+      const entry = get(req.params.id);
+      if (entry.status !== 'waiting' && entry.status !== 'tci') {
+        throw BadRequest(`Cannot admit a ${entry.status} entry`);
+      }
+      const { admittedDate } = AdmitBody.parse(req.body ?? {});
+      const updated = store.update<WaitingListEntry>(COLLECTION, entry.id, {
+        status: 'admitted',
+        admittedDate: admittedDate ?? nowIso(),
+      });
       return decorate(updated);
     });
 
