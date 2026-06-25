@@ -5,13 +5,13 @@ import {
   Bar,
   CartesianGrid,
   ComposedChart,
-  Line,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { CodeSystems } from '@trustos/ontology';
 import { useApiMutation, useApiQuery } from '@trustos/api-client';
 import {
   Badge,
@@ -59,7 +59,7 @@ export function FluidBalancePage() {
         <PageHeader
           title={patientName(data.patient)}
           description={`24-hour fluid balance · NHS ${
-            data.patient.identifier?.find((i) => i.value.length === 12)?.value ?? '—'
+            data.patient.identifier?.find((i) => i.system === CodeSystems.NHS_NUMBER)?.value ?? '—'
           }`}
         />
       </div>
@@ -102,15 +102,7 @@ export function FluidBalancePage() {
                     stroke="#009639"
                     fill="#00963922"
                     strokeWidth={2}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="balance"
-                    name="Cumulative balance"
-                    stroke="#009639"
                     dot={false}
-                    strokeWidth={2}
-                    legendType="none"
                   />
                 </ComposedChart>
               </ResponsiveContainer>
