@@ -249,8 +249,83 @@ export default defineModule({
         ],
       });
     }
+
+    // Guarantee at least one clinically meaningful allergy conflict awaiting
+    // verification so the CDS screening lane is always demonstrable, regardless
+    // of how the random prescription mix falls out.
+    seedAllergyConflict(store, subjects[0] ?? patients[0]);
   },
 });
+
+/**
+ * Ensure `patient` has an active penicillin allergy and an unverified
+ * penicillin prescription, producing a deterministic allergy conflict in the
+ * verification queue.
+ */
+function seedAllergyConflict(store: DataStore, patient: Patient | undefined): void {
+  if (!patient) return;
+  const display = patientDisplay(patient);
+  const patientRef = ref('Patient', patient.id);
+
+  const hasPenicillinAllergy = store
+    .query<AllergyIntolerance>(
+      'AllergyIntolerance',
+      (a) =>
+        a.patient?.reference === patientRef &&
+        a.clinicalStatus === 'active' &&
+        (a.code?.text ?? a.code?.coding?.[0]?.display ?? '').toLowerCase().includes('penicillin'),
+    )
+    .length > 0;
+  if (!hasPenicillinAllergy) {
+    store.create<AllergyIntolerance>('AllergyIntolerance', {
+      code: {
+        coding: [{ system: CodeSystems.SNOMED, code: '372687004', display: 'Penicillin' }],
+        text: 'Penicillin',
+      },
+      patient: { reference: patientRef, display },
+      clinicalStatus: 'active',
+      verificationStatus: 'confirmed',
+      criticality: 'high',
+      category: 'medication',
+      reactionManifestation: ['Anaphylaxis'],
+      recordedDate: isoDaysAgo(400),
+    });
+  }
+
+  const amoxicillin = MEDICATION_CATALOGUE.find((d) => d.classes.includes('penicillin'));
+  if (!amoxicillin) return;
+  const mr = store.create<MedicationRequest>('MedicationRequest', {
+    status: 'active',
+    intent: 'order',
+    priority: 'urgent',
+    medication: {
+      coding: [{ system: CodeSystems.SNOMED, code: amoxicillin.code, display: amoxicillin.name }],
+      text: amoxicillin.name,
+    },
+    subject: { reference: patientRef, display },
+    authoredOn: isoDaysAgo(0, new Date()),
+    dosageInstruction: [
+      {
+        text: `${amoxicillin.dose} ${amoxicillin.route} ${amoxicillin.frequency}`,
+        route: amoxicillin.route,
+        doseQuantity: amoxicillin.dose,
+        frequency: amoxicillin.frequency,
+      },
+    ],
+    dispenseQuantity: amoxicillin.dispenseQuantity,
+    courseOfTherapyType: 'acute',
+  });
+  const at = isoDaysAgo(0, new Date(Date.now() - 12 * 60_000));
+  store.create<DispenseRecord>(DISPENSE_COLLECTION, {
+    medicationRequest: ref('MedicationRequest', mr.id),
+    patient: patientRef,
+    status: 'to-verify',
+    priority: 'urgent',
+    createdAt: at,
+    updatedAt: at,
+    history: [{ status: 'to-verify', at }],
+  });
+}
 
 interface EnrichedRecord {
   record: DispenseRecord;

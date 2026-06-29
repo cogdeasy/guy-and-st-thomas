@@ -192,13 +192,17 @@ export default defineModule({
     for (const encounter of encounters) {
       const patientRef = encounter.subject.reference;
       const encounterRef = ref('Encounter', encounter.id);
-      const deteriorating = rng() < 0.3;
+      const deteriorating = rng() < 0.24;
+      // Each deteriorating patient peaks at a different severity, so the live
+      // worklist spreads realistically across the medium and high bands rather
+      // than everyone pinning at a peri-arrest NEWS2.
+      const peak = 0.45 + rng() * 0.5; // 0.45 → 0.95
       // 2–3 sets ending "now"; oldest first so values can trend over the last 24h.
       const hoursAgo = rng() < 0.5 ? [16, 8, 0] : [10, 0];
 
       hoursAgo.forEach((hours, idx) => {
         const progress = hoursAgo.length > 1 ? idx / (hoursAgo.length - 1) : 1; // 0 → oldest, 1 → latest
-        const reading = deteriorating ? deterioratingReading(rng, progress) : stableReading(rng);
+        const reading = deteriorating ? deterioratingReading(rng, progress, peak) : stableReading(rng);
         writeVitalsSet(store, {
           patientRef,
           encounterRef,
@@ -302,32 +306,39 @@ function round1(n: number): number {
   return Number(n.toFixed(1));
 }
 
-/** A physiologically normal reading (NEWS2 typically 0–2). */
+/**
+ * A physiologically stable reading. Most parameters sit squarely normal, but
+ * each is allowed to drift to a mildly abnormal value so the ward populates a
+ * realistic NEWS2 low band (1–4) rather than every stable patient scoring 0.
+ * Ranges are bounded so a stable patient never aggregates into the medium band.
+ */
 function stableReading(rng: () => number): VitalsReading {
   return {
-    respiratoryRate: 12 + Math.floor(rng() * 7), // 12–18
-    spo2: 96 + Math.floor(rng() * 4), // 96–99
+    respiratoryRate: 12 + Math.floor(rng() * 8), // 12–19 (0 pts)
+    spo2: 94 + Math.floor(rng() * 6), // 94–99 (0–1 pts)
     onOxygen: false,
-    systolicBp: 112 + Math.floor(rng() * 38), // 112–149
-    heartRate: 60 + Math.floor(rng() * 30), // 60–89
+    systolicBp: 108 + Math.floor(rng() * 44), // 108–151 (0–1 pts)
+    heartRate: 58 + Math.floor(rng() * 48), // 58–105 (0–1 pts)
     consciousness: 'A',
-    temperature: round1(36.3 + rng() * 1.2), // 36.3–37.5
+    temperature: round1(36.0 + rng() * 1.9), // 36.0–37.9 (0–1 pts)
   };
 }
 
 /**
- * A deteriorating reading whose abnormality grows with `progress` (0 → 1),
- * producing a rising NEWS2 trend that reaches the medium/high band.
+ * A deteriorating reading whose abnormality grows with `progress` (0 → 1) and
+ * is capped by a per-patient `peak` severity (0.45 → 0.95). Lower-peak patients
+ * settle in the NEWS2 medium band; higher-peak patients reach the high band —
+ * giving a clinically realistic spread rather than everyone at the ceiling.
  */
-function deterioratingReading(rng: () => number, progress: number): VitalsReading {
-  const sev = 0.4 + progress * 0.6; // never fully normal, worsens over time
+function deterioratingReading(rng: () => number, progress: number, peak = 0.9): VitalsReading {
+  const sev = peak * (0.55 + progress * 0.45); // ramps up toward the patient's peak
   return {
-    respiratoryRate: Math.round(20 + sev * (8 + rng() * 4)), // up to ~30+
-    spo2: Math.round(95 - sev * (7 + rng() * 4)), // down toward ~88
-    onOxygen: progress > 0.5,
-    systolicBp: Math.round(112 - sev * (24 + rng() * 12)), // down toward ~85
-    heartRate: Math.round(95 + sev * (25 + rng() * 15)), // up toward ~130
-    consciousness: progress > 0.75 && rng() < 0.5 ? 'V' : 'A',
-    temperature: round1(38.2 + sev * (1 + rng())), // febrile
+    respiratoryRate: Math.round(17 + sev * 9), // ~21 (mild) → ~26 (severe)
+    spo2: Math.round(97 - sev * 6), // ~94 → ~91
+    onOxygen: progress > 0.6 && peak > 0.7,
+    systolicBp: Math.round(120 - sev * 20), // ~111 → ~101
+    heartRate: Math.round(88 + sev * 32), // ~102 → ~118
+    consciousness: progress > 0.8 && peak > 0.85 && rng() < 0.4 ? 'V' : 'A',
+    temperature: round1(37.5 + sev * 1.5), // mildly → markedly febrile
   };
 }

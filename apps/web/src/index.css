@@ -1,3 +1,5 @@
+@import '@fontsource-variable/inter';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,4 +12,35 @@ body,
 
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
+  font-feature-settings:
+    'cv02' on,
+    'cv03' on,
+    'cv04' on,
+    'ss01' on;
+}
+
+/* Tabular figures for metrics and tables — keeps numbers aligned. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Slim, modern scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203 213 225) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(203 213 225);
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(148 163 184);
+}
+
+:root {
+  color-scheme: light;
 }
